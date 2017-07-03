@@ -124,7 +124,7 @@ class IntelCompiler(Compiler):
         super(IntelCompiler, self).__init__(*args, **kwargs)
         self.cc = 'icc'
         self.ld = 'icc'
-        self.cflags = ['-O3', '-g', '-fPIC', '-Wall', '-std=c99', "-xhost"]
+        self.cflags = ['-O2', '-g', '-fPIC', '-Wall', '-std=c99', "-xhost", "-vec-threshold0"]
         self.ldflags = ['-shared']
 
         if configuration['openmp']:

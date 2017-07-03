@@ -165,7 +165,7 @@ def more_heuristic_attempts(blocksizes):
 
 options = {
     'at_squeezer': 5,
-    'at_blocksize': sorted({8, 16, 24, 32, 40, 64, 128}),
+    'at_blocksize': sorted({4, 6, 8, 16, 24, 32, 40, 64, 128, 256}),
     'at_stack_limit': resource.getrlimit(resource.RLIMIT_STACK)[0] / 4
 }
 """Autotuning options."""
