@@ -108,6 +108,8 @@ def switch_cpu(develop_mode):
         configuration['isa'], configuration['platform'] = 'cpp', 'intel64'
 yask_configuration.add('develop-mode', True, [False, True], switch_cpu)  # noqa
 
+yask_configuration['develop-mode'] = False
+
 env_vars_mapper = {
     'DEVITO_YASK_DEVELOP': 'develop-mode',
     'DEVITO_YASK_FOLDING': 'folding',
