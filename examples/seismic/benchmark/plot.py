@@ -8,15 +8,14 @@ if len(sys.argv) != 2:
     print "Usage: python plot.py machine=[endeavour,hero]"
 
 machines = {}
-execfile(os.path.join('..', 'miscellanea', 'machines.txt'), machines)
+execfile('machines.txt', machines)
 
-root = [x[0] for x in os.walk(os.path.join('..', 'experimentation', 'raw', sys.argv[1]))]
+devito_home = os.environ['DEVITO_HOME']
+results_dir = os.path.join(devito_home, '..', 'experimentation')
+raw_dir = [x[0] for x in os.walk(os.path.join(results_dir, 'raw', sys.argv[1]))]
+plots_dir = os.path.join(results_dir, 'plots', sys.argv[1])
 
-examples_dir = os.path.join('..', 'devito', 'examples')
-executable = os.path.join(examples_dir, 'benchmark.py')
-plots_dir = os.path.join('..', 'experimentation', 'plots', sys.argv[1])
-
-for i in root[1:]:
+for i in raw_dir[1:]:
     location = i.split('/')[-1]
     problem, mode, grid, arch, date = location.split('-')
     files = [f for f in os.listdir(i) if f.endswith('json')]
@@ -36,15 +35,14 @@ for i in root[1:]:
     space_orders = space_orders.replace(',', '').replace('[', '').replace(']', '')
     tn = sample.split('tn')[1].split('.')[0]
 
-    if 'ekf' in key:
+    if 'ekf' in arch:
         os.environ['DEVITO_ARCH'] = 'knl'
     else:
         os.environ['DEVITO_ARCH'] = 'intel'
 
-    args = ['python', executable, '--bench-mode', mode, 'plot', '-P', problem, '-a', '-o', '-d',
+    args = ['python', 'benchmark.py', '--bench-mode', mode, 'plot', '-P', problem, '-a', '-d',
             grid, grid, grid, '-so', space_orders, '-to', '2', '--tn', tn,
             '-r', i, '-p', plots_dir,
-            '--no-legacy',
             '--max_bw', str(machine['dram-stream-bw']),
             '--max_flops', str(machine['machine-peak']),
             '--point_runtime',

@@ -145,10 +145,10 @@ if [[ "$mode" == "maxperf" || "$mode" == "dse" || "$mode" == "dle" ]]; then
     # Record machine model
     cat /proc/cpuinfo | grep 'model name' | uniq > $DEVITO_RESULTS/core_model.txt
     # Run the benchmark
-    $NUMACTL python $DEVITO_HOME/examples/benchmark.py bench -bm $mode -P $problem --tn $time_duration -a -o -d $grid $grid $grid -so $space_orders -to $time_orders -r $DEVITO_RESULTS
+    $NUMACTL python $DEVITO_HOME/examples/seismic/benchmark/benchmark.py bench -bm $mode --repeats 1 -P $problem --tn $time_duration -a -d $grid $grid $grid -so $space_orders -to $time_orders -r $DEVITO_RESULTS
 elif [ "$mode" == "srun" ]; then
     # Single shot run
-    $PREFIX $NUMACTL python $SUFFIX $DEVITO_HOME/examples/benchmark.py run -P $problem --tn $time_duration -o $dse $dle $at -d $grid $grid $grid -so $order -to 2
+    $PREFIX $NUMACTL python $SUFFIX $DEVITO_HOME/examples/seismic/benchmark/benchmark.py run -P $problem --tn $time_duration $dse $dle $at -d $grid $grid $grid -so $order -to 2
 else
     echo "Unrecognised mode"
     exit
