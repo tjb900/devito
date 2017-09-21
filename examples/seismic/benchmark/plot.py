@@ -17,7 +17,7 @@ plots_dir = os.path.join(results_dir, 'plots', sys.argv[1])
 
 for i in raw_dir[1:]:
     location = i.split('/')[-1]
-    problem, mode, grid, arch, date = location.split('-')
+    problem, mode, grid, arch, backend = location.split('-')
     files = [f for f in os.listdir(i) if f.endswith('json')]
     if not files:
         print "WTF? "

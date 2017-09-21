@@ -3,7 +3,7 @@
 # Launch as:
 #
 #    problem=[acoustic,tti] order=int grid=int \
-#    dse=[...] dle=[...] at=[True,False (default)] mode=[srun,maxperf,dse,dle] \
+#    backend=[core,yask] dse=[...] dle=[...] at=[True,False (default)] mode=[srun,maxperf,dse,dle] \
 #    proc=[bdwb,skl,ekf_{flat,cache}] system=[hero,edv] hyperthreads=int \
 #    compiler=[gcc,icc,knl] vtune=[...] advisor=[...] cprofile=[...] \
 #    ./path/to/devito/examples/launcher.sh
@@ -17,6 +17,10 @@ fi
 if [ -z ${DEVITO_OUTPUT+x} ]; then
     echo "Please, set DEVITO_OUTPUT to the root results directory"
     exit
+fi
+
+if [ -z ${backend+x} ]; then
+    backend="core"
 fi
 
 if [ -z ${proc+x} ]; then
@@ -77,6 +81,9 @@ export DEVITO_ARCH=$compiler
 
 # OpenMP always activated when DLE is in advanced mode
 export DEVITO_OPENMP=1
+
+# Backend used by Devito to run the operators
+export DEVITO_BACKEND=$backend
 
 # The architecture on which we're running
 arch=$system"_"$proc
@@ -140,10 +147,14 @@ fi
 
 if [[ "$mode" == "maxperf" || "$mode" == "dse" || "$mode" == "dle" ]]; then
     # Output directories
-    export DEVITO_RESULTS=$DEVITO_OUTPUT/$system/$name-$arch-$timestamp
+    export DEVITO_RESULTS=$DEVITO_OUTPUT/$system/$name-$arch-$backend
     mkdir -p $DEVITO_RESULTS
     # Record machine model
     cat /proc/cpuinfo | grep 'model name' | uniq > $DEVITO_RESULTS/core_model.txt
+    # Record branch+commit on top of which the benchmark is executed
+    git branch > $DEVITO_RESULTS/version.txt
+    git log -n 1 --pretty=format:"%H" >> $DEVITO_RESULTS/version.txt
+    sed -i -e '$a\' $DEVITO_RESULTS/version.txt
     # Run the benchmark
     $NUMACTL python $DEVITO_HOME/examples/seismic/benchmark/benchmark.py bench -bm $mode --repeats 1 -P $problem --tn $time_duration -a -d $grid $grid $grid -so $space_orders -to $time_orders -r $DEVITO_RESULTS
 elif [ "$mode" == "srun" ]; then
