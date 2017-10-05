@@ -11,7 +11,7 @@ from devito.cgen_utils import Allocator
 from devito.compiler import jit_compile, load
 from devito.dimension import time, Dimension
 from devito.dle import compose_nodes, filter_iterations, transform
-from devito.dse import clusterize, indexify, rewrite, q_indexed, retrieve_terminals
+from devito.dse import clusterize, indexify, rewrite, retrieve_terminals
 from devito.interfaces import Forward, Backward, CompositeData, Object
 from devito.logger import bar, error, info
 from devito.nodes import Element, Expression, Function, Iteration, List, LocalExpression
@@ -83,7 +83,7 @@ class Operator(Function):
         stencils = self._retrieve_stencils(expressions)
 
         # Parameters of the Operator (Dimensions necessary for data casts)
-        parameters = self.input + [i for i in self.dimensions if i.size is None]
+        parameters = self.input + [i for i in self.dimensions if not i.is_Fixed]
 
         # Group expressions based on their Stencil
         clusters = clusterize(expressions, stencils)
@@ -198,7 +198,9 @@ class Operator(Function):
         dle_arguments = OrderedDict()
         autotune = True
         for i in self.dle_arguments:
-            dim_size = dim_sizes.get(i.original_dim.name, i.original_dim.size)
+            dim_size = dim_sizes.get(i.original_dim.name,
+                                     i.original_dim.size if i.original_dim.is_Fixed
+                                     else None)
             if dim_size is None:
                 error('Unable to derive size of dimension %s from defaults. '
                       'Please provide an explicit value.' % i.original_dim.name)
@@ -302,7 +304,8 @@ class Operator(Function):
                 needed = entries[index:]
 
                 # Build and insert the required Iterations
-                iters = [Iteration([], j.dim, j.dim.size, offsets=j.ofs) for j in needed]
+                iters = [Iteration([], j.dim, j.dim.symbolic_size, offsets=j.ofs)
+                         for j in needed]
                 body, tree = compose_nodes(iters + [expressions], retrieve=True)
                 scheduling = OrderedDict(zip(needed, tree))
                 if root is None:
@@ -420,9 +423,9 @@ class Operator(Function):
                 pass
         input = filter_sorted(input, key=attrgetter('name'))
 
-        output = [i.lhs.base.function for i in expressions if q_indexed(i.lhs)]
+        output = [i.lhs.base.function for i in expressions if i.lhs.is_Indexed]
 
-        indexeds = [i for i in terms if q_indexed(i)]
+        indexeds = [i for i in terms if i.is_Indexed]
         dimensions = []
         for indexed in indexeds:
             for i in indexed.indices:
@@ -453,13 +456,16 @@ class OperatorRunnable(Operator):
         self.cfunction(*list(arguments.values()))
 
         # Output summary of performance achieved
+        return self._profile_output(dim_sizes)
+
+    def _profile_output(self, dim_sizes):
+        """Return a performance summary of the profiled sections."""
         summary = self.profiler.summary(dim_sizes, self.dtype)
         with bar():
             for k, v in summary.items():
                 name = '%s<%s>' % (k, ','.join('%d' % i for i in v.itershape))
                 info("Section %s with OI=%.2f computed in %.3f s [Perf: %.2f GFlops/s]" %
                      (name, v.oi, v.time, v.gflopss))
-
         return summary
 
     def _profile_sections(self, nodes, parameters):

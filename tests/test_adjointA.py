@@ -2,40 +2,39 @@ import numpy as np
 import pytest
 from numpy import linalg
 
-from devito import time
 from devito.logger import info
 from examples.seismic import demo_model, RickerSource, Receiver
 from examples.seismic.acoustic import AcousticWaveSolver
 
 
 presets = {
-    'constant': {'preset': 'constant'},
-    'layers': {'preset': 'layers', 'ratio': 3},
+    'constant': {'preset': 'constant-isotropic'},
+    'layers': {'preset': 'layers-isotropic', 'ratio': 3},
 }
 
 
-@pytest.mark.parametrize('mkey, dimensions, time_order, space_order, nbpml, fix_dim', [
+@pytest.mark.parametrize('mkey, shape, time_order, space_order, nbpml', [
     # 2D tests with varying time and space orders
-    ('layers', (60, 70), 2, 4, 10, False), ('layers', (60, 70), 2, 8, 10, False),
-    ('layers', (60, 70), 2, 12, 10, False), ('layers', (60, 70), 4, 4, 10, False),
-    ('layers', (60, 70), 4, 8, 10, False), ('layers', (60, 70), 4, 12, 10, False),
+    ('layers', (60, 70), 2, 4, 10), ('layers', (60, 70), 2, 8, 10),
+    ('layers', (60, 70), 2, 12, 10), ('layers', (60, 70), 4, 4, 10),
+    ('layers', (60, 70), 4, 8, 10), ('layers', (60, 70), 4, 12, 10),
     # 3D tests with varying time and space orders
-    ('layers', (60, 70, 80), 2, 4, 10, False), ('layers', (60, 70, 80), 2, 8, 10, False),
-    ('layers', (60, 70, 80), 2, 12, 10, False), ('layers', (60, 70, 80), 4, 4, 10, False),
-    ('layers', (60, 70, 80), 4, 8, 10, False), ('layers', (60, 70, 80), 4, 12, 10, False),
+    ('layers', (60, 70, 80), 2, 4, 10), ('layers', (60, 70, 80), 2, 8, 10),
+    ('layers', (60, 70, 80), 2, 12, 10), ('layers', (60, 70, 80), 4, 4, 10),
+    ('layers', (60, 70, 80), 4, 8, 10), ('layers', (60, 70, 80), 4, 12, 10),
     # Fixed dimension test in 2D and 3D
-    ('layers', (60, 70), 2, 4, 10, True), ('layers', (60, 70, 80), 2, 4, 10, True),
+    ('layers', (60, 70), 2, 4, 10), ('layers', (60, 70, 80), 2, 4, 10),
     # Constant model in 2D and 3D
-    ('constant', (60, 70), 2, 8, 14, False), ('constant', (60, 70, 80), 2, 8, 14, False),
+    ('constant', (60, 70), 2, 8, 14), ('constant', (60, 70, 80), 2, 8, 14),
 ])
-def test_acoustic(mkey, dimensions, time_order, space_order, nbpml, fix_dim):
+def test_acoustic(mkey, shape, time_order, space_order, nbpml):
     t0 = 0.0  # Start time
     tn = 500.  # Final time
     nrec = 130  # Number of receivers
 
     # Create model from preset
-    model = demo_model(spacing=[15. for _ in dimensions],
-                       shape=dimensions, nbpml=nbpml, **(presets[mkey]))
+    model = demo_model(spacing=[15. for _ in shape],
+                       shape=shape, nbpml=nbpml, **(presets[mkey]))
 
     # Derive timestepping from model spacing
     dt = model.critical_dt * (1.73 if time_order == 4 else 1.0)
@@ -56,9 +55,6 @@ def test_acoustic(mkey, dimensions, time_order, space_order, nbpml, fix_dim):
     solver = AcousticWaveSolver(model, source=src, receiver=rec,
                                 time_order=time_order,
                                 space_order=space_order)
-
-    # Set fixed ("baked-in") time dimension if requested
-    time.size = solver.source.nt if fix_dim else None
 
     # Create adjoint receiver symbol
     srca = Receiver(name='srca', ntime=solver.source.nt,

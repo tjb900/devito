@@ -1,7 +1,7 @@
 import numpy as np
 import os
 
-from devito import DenseData, ConstantData
+from devito import Grid, DenseData, ConstantData
 from devito.logger import error
 from examples.pickle import Pickleable
 
@@ -13,13 +13,31 @@ def demo_model(preset, **kwargs):
     Utility function to create preset :class:`Model` objects for
     demonstration and testing purposes. The particular presets are ::
 
-    * 'layer2D': Simple two-layer model with velocities 1.5 km/s
+    * `constant-isotropic` : Constant velocity (1.5km/sec) isotropic model
+    * `constant-tti` : Constant anisotropic model. Velocity is 1.5 km/sec and
+                      Thomsen parameters are epsilon=.3, delta=.2, theta = .7rad
+                      and phi=.35rad for 3D. 2d/3d is defined from the input shape
+    * 'layers-isotropic': Simple two-layer model with velocities 1.5 km/s
                  and 2.5 km/s in the top and bottom layer respectively.
-    * 'marmousi2D': Loads the 2D Marmousi data set from the given
+                 2d/3d is defined from the input shape
+    * 'layers-tti': Simple two-layer TTI model with velocities 1.5 km/s
+                    and 2.5 km/s in the top and bottom layer respectively.
+                    Thomsen parameters in the top layer are 0 and in the lower layer
+                    are epsilon=.3, delta=.2, theta = .5rad and phi=.1 rad for 3D.
+                    2d/3d is defined from the input shape
+    * 'circle-isotropic': Simple camembert model with velocities 1.5 km/s
+                 and 2.5 km/s in a circle at the center. 2D only.
+    * 'marmousi2d-isotropic': Loads the 2D Marmousi data set from the given
+                    filepath. Requires the ``opesci/data`` repository
+                    to be available on your machine.
+    * 'marmousi2d-tti': Loads the 2D Marmousi data set from the given
+                    filepath. Requires the ``opesci/data`` repository
+                    to be available on your machine.
+    * 'marmousi3d-tti': Loads the 2D Marmousi data set from the given
                     filepath. Requires the ``opesci/data`` repository
                     to be available on your machine.
     """
-    if preset.lower() in ['constant']:
+    if preset.lower() in ['constant-isotropic']:
         # A constant single-layer model in a 2D or 3D domain
         # with velocity 1.5km/s.
         shape = kwargs.pop('shape', (101, 101))
@@ -31,7 +49,29 @@ def demo_model(preset, **kwargs):
         return Model(vp=vp, origin=origin, shape=shape,
                      spacing=spacing, nbpml=nbpml, **kwargs)
 
-    elif preset.lower() in ['layers', 'twolayer', '2layer']:
+    elif preset.lower() in ['constant-tti']:
+        # A constant single-layer model in a 2D or 3D domain
+        # with velocity 1.5km/s.
+        shape = kwargs.pop('shape', (101, 101))
+        spacing = kwargs.pop('spacing', tuple([10. for _ in shape]))
+        origin = kwargs.pop('origin', tuple([0. for _ in shape]))
+        nbpml = kwargs.pop('nbpml', 10)
+        v = np.empty(shape, dtype=np.float32)
+        v[:] = 1.5
+        epsilon = .3*np.ones(shape)
+        delta = .2*np.ones(shape)
+        theta = .7*np.ones(shape)
+        phi = None
+        if len(shape) > 2:
+            phi = .35*np.ones(shape)
+
+        return Model(vp=v, origin=origin, shape=shape,
+                     spacing=spacing, nbpml=nbpml,
+                     epsilon=epsilon, delta=delta, theta=theta, phi=phi,
+                     **kwargs)
+
+    elif preset.lower() in ['layers-isotropic', 'twolayer-isotropic',
+                            '2layer-isotropic']:
         # A two-layer model in a 2D or 3D domain with two different
         # velocities split across the height dimension:
         # By default, the top part of the domain has 1.5 km/s,
@@ -52,7 +92,37 @@ def demo_model(preset, **kwargs):
         return Model(vp=v, origin=origin, shape=shape,
                      spacing=spacing, nbpml=nbpml, **kwargs)
 
-    elif preset.lower() in ['circle']:
+    elif preset.lower() in ['layers-tti', 'twolayer-tti', '2layer-tti']:
+        # A two-layer model in a 2D or 3D domain with two different
+        # velocities split across the height dimension:
+        # By default, the top part of the domain has 1.5 km/s,
+        # and the bottom part of the domain has 2.5 km/s.\
+        shape = kwargs.pop('shape', (101, 101))
+        spacing = kwargs.pop('spacing', tuple([10. for _ in shape]))
+        origin = kwargs.pop('origin', tuple([0. for _ in shape]))
+        nbpml = kwargs.pop('nbpml', 10)
+        ratio = kwargs.pop('ratio', 2)
+        vp_top = kwargs.pop('vp_top', 1.5)
+        vp_bottom = kwargs.pop('vp_bottom', 2.5)
+
+        # Define a velocity profile in km/s
+        v = np.empty(shape, dtype=np.float32)
+        v[:] = vp_top  # Top velocity (background)
+        v[..., int(shape[-1] / ratio):] = vp_bottom  # Bottom velocity
+
+        epsilon = .3*(v - 1.5)
+        delta = .2*(v - 1.5)
+        theta = .5*(v - 1.5)
+        phi = None
+        if len(shape) > 2:
+            phi = .1*(v - 1.5)
+
+        return Model(vp=v, origin=origin, shape=shape,
+                     spacing=spacing, nbpml=nbpml,
+                     epsilon=epsilon, delta=delta, theta=theta, phi=phi,
+                     **kwargs)
+
+    elif preset.lower() in ['circle-isotropic']:
         # A simple circle in a 2D domain with a background velocity.
         # By default, the circle velocity is 2.5 km/s,
         # and the background veloity is 3.0 km/s.
@@ -77,7 +147,7 @@ def demo_model(preset, **kwargs):
         return Model(vp=v, origin=origin, shape=shape,
                      spacing=spacing, nbpml=nbpml)
 
-    elif preset.lower() in ['marmousi', 'marmousi2d']:
+    elif preset.lower() in ['marmousi-isotropic', 'marmousi2d-isotropic']:
         shape = (1601, 401)
         spacing = (7.5, 7.5)
         origin = (0., 0.)
@@ -97,6 +167,89 @@ def demo_model(preset, **kwargs):
 
         return Model(vp=v, origin=origin, shape=v.shape,
                      spacing=spacing, nbpml=20)
+
+    elif preset.lower() in ['marmousi-tti2d', 'marmousi2d-tti']:
+
+        shape_full = (201, 201, 70)
+        shape = (201, 70)
+        spacing = (10., 10.)
+        origin = (0., 0.)
+        nbpml = kwargs.pop('nbpml', 20)
+
+        # Read 2D Marmousi model from opesc/data repo
+        data_path = kwargs.pop('data_path', None)
+        if data_path is None:
+            error("Path to opesci/data not found! Please specify with "
+                  "'data_path=<path/to/opesci/data>'")
+            raise ValueError("Path to model data unspecified")
+        path = os.path.join(data_path, 'marmousi3D/vp_marmousi_bi')
+
+        # velocity
+        vp = 1e-3 * np.fromfile(os.path.join(data_path, 'marmousi3D/MarmousiVP.raw'),
+                                dtype='float32', sep="")
+        vp = vp.reshape(shape_full)
+        vp = vp[101, :, :]
+        # Epsilon, in % in file, resale between 0 and 1
+        epsilon = np.fromfile(os.path.join(data_path, 'marmousi3D/MarmousiEps.raw'),
+                              dtype='float32', sep="") * 1e-2
+        epsilon = epsilon.reshape(shape_full)
+        epsilon = epsilon[101, :, :]
+        # Delta, in % in file, resale between 0 and 1
+        delta = np.fromfile(os.path.join(data_path, 'marmousi3D/MarmousiDelta.raw'),
+                            dtype='float32', sep="") * 1e-2
+        delta = delta.reshape(shape_full)
+        delta = delta[101, :, :]
+        # Theta, in degrees in file, resale in radian
+        theta = np.fromfile(os.path.join(data_path, 'marmousi3D/MarmousiTilt.raw'),
+                            dtype='float32', sep="")
+        theta = np.float32(np.pi / 180 * theta.reshape(shape_full))
+        theta = theta[101, :, :]
+
+        return Model(vp=vp, origin=origin, shape=shape,
+                     spacing=spacing, nbpml=nbpml,
+                     epsilon=epsilon, delta=delta, theta=theta,
+                     **kwargs)
+
+    elif preset.lower() in ['marmousi-tti3d', 'marmousi3d-tti']:
+
+        shape = (201, 201, 70)
+        spacing = (10., 10., 10.)
+        origin = (0., 0., 0.)
+        nbpml = kwargs.pop('nbpml', 20)
+
+        # Read 2D Marmousi model from opesc/data repo
+        data_path = kwargs.pop('data_path', None)
+        if data_path is None:
+            error("Path to opesci/data not found! Please specify with "
+                  "'data_path=<path/to/opesci/data>'")
+            raise ValueError("Path to model data unspecified")
+        path = os.path.join(data_path, 'marmousi3D/vp_marmousi_bi')
+
+        # Velcoity
+        vp = 1e-3 * np.fromfile(os.path.join(data_path, 'marmousi3D/MarmousiVP.raw'),
+                                dtype='float32', sep="")
+        vp = vp.reshape(shape)
+        # Epsilon, in % in file, resale between 0 and 1
+        epsilon = np.fromfile(os.path.join(data_path, 'marmousi3D/MarmousiEps.raw'),
+                              dtype='float32', sep="") * 1e-2
+        epsilon = epsilon.reshape(shape)
+        # Delta, in % in file, resale between 0 and 1
+        delta = np.fromfile(os.path.join(data_path, 'marmousi3D/MarmousiDelta.raw'),
+                            dtype='float32', sep="") * 1e-2
+        delta = delta.reshape(shape)
+        # Theta, in degrees in file, resale in radian
+        theta = np.fromfile(os.path.join(data_path, 'marmousi3D/MarmousiTilt.raw'),
+                            dtype='float32', sep="")
+        theta = np.float32(np.pi / 180 * theta.reshape(shape))
+        # Phi, in degrees in file, resale in radian
+        phi = np.fromfile(os.path.join(data_path, 'marmousi3D/Azimuth.raw'),
+                          dtype='float32', sep="")
+        phi = np.float32(np.pi / 180 * phi.reshape(shape))
+
+        return Model(vp=vp, origin=origin, shape=shape,
+                     spacing=spacing, nbpml=nbpml,
+                     epsilon=epsilon, delta=delta, theta=theta, phi=phi,
+                     **kwargs)
 
     else:
         error('Unknown model preset name %s' % preset)
@@ -151,37 +304,34 @@ class Model(Pickleable):
     _pickled = ['origin', 'spacing', 'shape', 'vp', 'nbpml', 'dtype', 'epsilon', 'delta', 'theta', 'phi']
     def __init__(self, origin, spacing, shape, vp, nbpml=20, dtype=np.float32,
                  epsilon=None, delta=None, theta=None, phi=None):
-        self.origin = origin
-        self.spacing = spacing
         self.shape = shape
         self.nbpml = int(nbpml)
-        self.dtype = dtype
 
-        # Ensure same dimensions on all inpute parameters
-        assert(len(origin) == len(spacing))
-        assert(len(origin) == len(shape))
+        shape_pml = np.array(shape) + 2 * self.nbpml
+        # Physical extent is calculated per cell, so shape - 1
+        extent = tuple(np.array(spacing) * (shape_pml - 1))
+        self.grid = Grid(extent=extent, shape=shape_pml,
+                         origin=origin, dtype=dtype)
 
         # Create square slowness of the wave as symbol `m`
         if isinstance(vp, np.ndarray):
-            self.m = DenseData(name="m", shape=self.shape_domain, dtype=self.dtype)
+            self.m = DenseData(name="m", grid=self.grid)
         else:
-            self.m = ConstantData(name="m", value=1/vp**2, dtype=self.dtype)
+            self.m = ConstantData(name="m", value=1/vp**2)
 
         # Set model velocity, which will also set `m`
         self.vp = vp
 
         # Create dampening field as symbol `damp`
-        self.damp = DenseData(name="damp", shape=self.shape_domain,
-                              dtype=self.dtype)
-        damp_boundary(self.damp.data, self.nbpml, spacing=self.get_spacing())
+        self.damp = DenseData(name="damp", grid=self.grid)
+        damp_boundary(self.damp.data, self.nbpml, spacing=self.spacing)
 
         # Additional parameter fields for TTI operators
         self.scale = 1.
 
         if epsilon is not None:
             if isinstance(epsilon, np.ndarray):
-                self.epsilon = DenseData(name="epsilon", shape=self.shape_domain,
-                                         dtype=self.dtype)
+                self.epsilon = DenseData(name="epsilon", grid=self.grid)
                 self.epsilon.data[:] = self.pad(1 + 2 * epsilon)
                 # Maximum velocity is scale*max(vp) if epsilon > 0
                 if np.max(self.epsilon.data) > 0:
@@ -194,8 +344,7 @@ class Model(Pickleable):
 
         if delta is not None:
             if isinstance(delta, np.ndarray):
-                self.delta = DenseData(name="delta", shape=self.shape_domain,
-                                       dtype=self.dtype)
+                self.delta = DenseData(name="delta", grid=self.grid)
                 self.delta.data[:] = self.pad(np.sqrt(1 + 2 * delta))
             else:
                 self.delta = delta
@@ -204,8 +353,7 @@ class Model(Pickleable):
 
         if theta is not None:
             if isinstance(theta, np.ndarray):
-                self.theta = DenseData(name="theta", shape=self.shape_domain,
-                                       dtype=self.dtype)
+                self.theta = DenseData(name="theta", grid=self.grid)
                 self.theta.data[:] = self.pad(theta)
             else:
                 self.theta = theta
@@ -214,8 +362,7 @@ class Model(Pickleable):
 
         if phi is not None:
             if isinstance(phi, np.ndarray):
-                self.phi = DenseData(name="phi", shape=self.shape_domain,
-                                     dtype=self.dtype)
+                self.phi = DenseData(name="phi", grid=self.grid)
                 self.phi.data[:] = self.pad(phi)
             else:
                 self.phi = phi
@@ -225,9 +372,30 @@ class Model(Pickleable):
     @property
     def dim(self):
         """
-        Spatial dimension of the model domain
+        Spatial dimension of the problem and model domain.
         """
-        return len(self.shape)
+        return self.grid.dim
+
+    @property
+    def spacing(self):
+        """
+        Grid spacing for all fields in the physical model.
+        """
+        return self.grid.spacing
+
+    @property
+    def origin(self):
+        """
+        Coordinates of the origin of the physical model.
+        """
+        return self.grid.origin
+
+    @property
+    def dtype(self):
+        """
+        Data type for all assocaited data objects.
+        """
+        return self.grid.dtype
 
     @property
     def shape_domain(self):
@@ -276,10 +444,6 @@ class Model(Pickleable):
             self.m.data[:] = self.pad(1 / (self.vp * self.vp))
         else:
             self.m.data = 1 / vp**2
-
-    def get_spacing(self):
-        """Return the grid size"""
-        return self.spacing
 
     def pad(self, data):
         """Padding function PNL layers in every direction for for the

@@ -2,12 +2,11 @@ from conftest import EVAL
 
 import numpy as np
 import pytest
-from sympy import Eq  # noqa
 
 from devito.dse import (clusterize, rewrite, xreplace_constrained, iq_timeinvariant,
                         iq_timevarying, estimate_cost, temporaries_graph,
                         common_subexprs_elimination, collect)
-from devito import Dimension, x, y, z, time, TimeData, clear_cache  # noqa
+from devito import Eq, Dimension, x, y, z, time, TimeData, clear_cache  # noqa
 from devito.interfaces import ScalarFunction
 from devito.nodes import Expression
 from devito.stencil import Stencil
@@ -20,7 +19,7 @@ from examples.seismic.tti import AnisotropicWaveSolver
 # Acoustic
 
 def run_acoustic_forward(dse=None):
-    dimensions = (50, 50, 50)
+    shape = (50, 50, 50)
     spacing = (10., 10., 10.)
     nbpml = 10
     nrec = 101
@@ -28,8 +27,8 @@ def run_acoustic_forward(dse=None):
     tn = 250.0
 
     # Create two-layer model from preset
-    model = demo_model(preset='layers', vp_top=3., vp_bottom=4.5,
-                       spacing=spacing, shape=dimensions, nbpml=nbpml)
+    model = demo_model(preset='layers-isotropic', vp_top=3., vp_bottom=4.5,
+                       spacing=spacing, shape=shape, nbpml=nbpml)
 
     # Derive timestepping from model spacing
     dt = model.critical_dt
@@ -62,22 +61,19 @@ def test_acoustic_rewrite_basic():
 
 # TTI
 
-def tti_operator(dse=False):
+def tti_operator(dse=False, space_order=4):
     nrec = 101
     t0 = 0.0
     tn = 250.
     nbpml = 10
-    dimensions = (50, 50, 50)
+    shape = (50, 50, 50)
     spacing = (20., 20., 20.)
 
     # Two layer model for true velocity
-    model = demo_model('layers', ratio=3, nbpml=nbpml,
-                       shape=dimensions, spacing=spacing,
-                       epsilon=.4*np.ones(dimensions),
-                       delta=-.1*np.ones(dimensions),
-                       theta=-np.pi/7*np.ones(dimensions),
-                       phi=np.pi/5*np.ones(dimensions))
+    model = demo_model('layers-tti', ratio=3, nbpml=nbpml,
+                       shape=shape, spacing=spacing)
 
+    # Derive timestepping from model spacing
     # Derive timestepping from model spacing
     dt = model.critical_dt
     nt = int(1 + (tn-t0) / dt)  # Number of timesteps
@@ -94,7 +90,7 @@ def tti_operator(dse=False):
     rec.coordinates.data[:, 1:] = src.coordinates.data[0, 1:]
 
     return AnisotropicWaveSolver(model, source=src, receiver=rec,
-                                 time_order=2, space_order=4, dse=dse)
+                                 time_order=2, space_order=space_order, dse=dse)
 
 
 @pytest.fixture(scope="session")
@@ -107,10 +103,10 @@ def tti_nodse():
 def test_tti_clusters_to_graph():
     solver = tti_operator()
 
-    nodes = FindNodes(Expression).visit(solver.op_fwd.elemental_functions +
-                                        (solver.op_fwd,))
+    nodes = FindNodes(Expression).visit(solver.op_fwd('centered').elemental_functions +
+                                        (solver.op_fwd('centered'),))
     expressions = [n.expr for n in nodes]
-    stencils = solver.op_fwd._retrieve_stencils(expressions)
+    stencils = solver.op_fwd('centered')._retrieve_stencils(expressions)
     clusters = clusterize(expressions, stencils)
     assert len(clusters) == 3
 
@@ -156,6 +152,16 @@ def test_tti_rewrite_aggressive(tti_nodse):
 
     assert np.allclose(tti_nodse[0].data, v.data, atol=10e-1)
     assert np.allclose(tti_nodse[1].data, rec.data, atol=10e-1)
+
+
+@pytest.mark.parametrize('kernel,space_order,expected', [
+    ('shifted', 8, 364), ('shifted', 16, 830),
+    ('centered', 8, 170), ('centered', 16, 306)
+])
+def test_tti_rewrite_aggressive_opcounts(kernel, space_order, expected):
+    operator = tti_operator(dse='aggressive', space_order=space_order)
+    _, _, _, summary = operator.forward(kernel=kernel, save=False)
+    assert summary['main'].ops == expected
 
 
 # DSE manipulation
