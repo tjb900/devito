@@ -109,7 +109,7 @@ class BasicRewriter(AbstractRewriter):
                              for i in required])
 
                 call, params = zip(*args)
-                handle = flatten([p.rtargs for p in params])
+                handle = flatten(params)
                 name = "f_%d" % root.tag
 
                 # Produce the new Call

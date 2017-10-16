@@ -13,7 +13,6 @@ from devito.dse import as_symbol, retrieve_terminals
 from devito.types import Indexed, Symbol
 from devito.stencil import Stencil
 from devito.tools import as_tuple, filter_ordered, flatten, is_integer
-from devito.arguments import ArgumentProvider, Argument
 
 __all__ = ['Node', 'Block', 'Denormals', 'Expression', 'Callable', 'Call',
            'Iteration', 'List', 'LocalExpression', 'TimedList']
@@ -453,13 +452,7 @@ class Callable(Node):
         self.body = as_tuple(body)
         self.retval = retval
         self.prefix = prefix
-
-        if all(isinstance(i, ArgumentProvider) for i in parameters):
-            args = flatten([i.rtargs for i in parameters])
-        else:
-            assert(all(isinstance(i, Argument) for i in parameters))
-            args = parameters
-        self.parameters = as_tuple(args)
+        self.parameters = as_tuple(parameters)
 
     def __repr__(self):
         parameters = ",".join([c.dtype_to_ctype(i.dtype) for i in self.parameters])
