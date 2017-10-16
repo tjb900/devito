@@ -23,7 +23,7 @@ from devito.tools import as_tuple, filter_sorted, flatten, numpy_to_ctypes, part
 from devito.visitors import (FindScopes, ResolveIterationVariable,
                              SubstituteExpression, Transformer, NestedTransformer)
 from devito.exceptions import InvalidArgument, InvalidOperator
-from devito.arguments import ArgumentEngine
+from devito.arguments import runtime_arguments, ArgumentEngine
 
 
 class Operator(Callable):
@@ -83,9 +83,9 @@ class Operator(Callable):
         self.dtype = self._retrieve_dtype(expressions)
         self.input, self.output, self.dimensions = self._retrieve_symbols(expressions)
         stencils = self._retrieve_stencils(expressions)
-
-        # Parameters of the Operator (Dimensions necessary for data casts)
-        parameters = self.input + [i for i in self.dimensions]
+        
+        # Parameters of the Operator
+        parameters = self.input + self.dimensions
 
         # Group expressions based on their Stencil
         clusters = clusterize(expressions, stencils)
@@ -95,12 +95,6 @@ class Operator(Callable):
 
         # Wrap expressions with Iterations according to dimensions
         nodes = self._schedule_expressions(clusters)
-
-        # Initialise Argument Engine
-        self.argument_engine = ArgumentEngine()
-
-        # Extract dimension offsets
-        self.argument_engine.extract_dimension_offsets([i.stencil for i in clusters])
 
         # Introduce C-level profiling infrastructure
         nodes, self.profiler = self._profile_sections(nodes, parameters)
@@ -129,6 +123,11 @@ class Operator(Callable):
         # Introduce all required C declarations
         nodes = self._insert_declarations(nodes)
 
+        # Initialise Argument Engine
+        self.argument_engine = ArgumentEngine(stencils, parameters)
+
+        parameters = self.argument_engine.arguments
+
         # Finish instantiation
         super(Operator, self).__init__(self.name, nodes, 'int', parameters, ())
 
@@ -136,77 +135,29 @@ class Operator(Callable):
         """ Process any apply-time arguments passed to apply and derive values for
             any remaining arguments
         """
-        new_params = {}
-        # If we've been passed CompositeFunction objects as kwargs,
-        # they might have children that need to be substituted as well.
-        for k, v in kwargs.items():
-            if isinstance(v, CompositeFunction):
-                orig_param_l = [i for i in self.input if i.name == k]
-                # If I have been passed a parameter, I must have seen it before
-                if len(orig_param_l) == 0:
-                    raise InvalidArgument("Parameter %s does not exist in expressions " +
-                                          "passed to this Operator" % k)
-                # We've made sure the list isn't empty. Names should be unique so it
-                # should have exactly one entry
-                assert(len(orig_param_l) == 1)
-                orig_param = orig_param_l[0]
-                # Pull out the children and add them to kwargs
-                for orig_child, new_child in zip(orig_param.children, v.children):
-                    new_params[orig_child.name] = new_child
-        kwargs.update(new_params)
+        
+        autotune = kwargs.pop('autotune', False)
 
-        # Derivation. It must happen in the order [tensors -> dimensions -> scalars]
-        for i in self.parameters:
-            if i.is_TensorArgument:
-                assert(i.verify(kwargs.pop(i.name, None), self.argument_engine))
-        runtime_dimensions = [d for d in self.dimensions if not d.is_Fixed]
-        for d in runtime_dimensions:
-            d.verify(kwargs.pop(d.name, None), self.argument_engine, enforce=True)
-        for i in self.parameters:
-            if i.is_ScalarArgument:
-                i.verify(kwargs.pop(i.name, None), self.argument_engine, enforce=True)
-        dim_sizes = {}
-        for d in runtime_dimensions:
-            if d.value is not None:
-                _, d_start, d_end = d.value
-                # Calculte loop extent
-                d_extent = d_end - d_start
-            else:
-                d_extent = None
-            dim_sizes[d.name] = d_extent
-        dle_arguments, autotune = self._dle_arguments(dim_sizes)
+        arguments = self.argument_engine.handle(**kwargs)
+
+        dim_sizes = dict([(d.name, self._runtime_dim_extent(d, arguments)) for d in self.dimensions])
+        dle_arguments, dle_autotune = self._dle_arguments(dim_sizes)
         dim_sizes.update(dle_arguments)
-
-        autotune = autotune and kwargs.pop('autotune', False)
-
-        # Make sure we've used all arguments passed
-        if len(kwargs) > 0:
-            raise InvalidArgument("Unknown arguments passed: " + ", ".join(kwargs.keys()))
-
-        mapper = OrderedDict([(d.name, d) for d in self.dimensions])
-        for d, v in dim_sizes.items():
-            assert(mapper[d].verify(v, self.argument_engine))
-
-        arguments = self._default_args()
+        autotune = autotune and dle_autotune
 
         if autotune:
             arguments = self._autotune(arguments)
 
-        # Clear the temp values we stored in the arg objects since we've pulled them out
-        # into the OrderedDict object above
-        self._reset_args()
-
         return arguments, dim_sizes
 
+    def _runtime_dim_extent(self, dimension, arguments):
+        try:
+            return arguments[dimension.end_name] - arguments[dimension.start_name]
+        except KeyError:
+            return None
+    
     def _default_args(self):
         return OrderedDict([(x.name, x.value) for x in self.parameters])
-
-    def _reset_args(self):
-        """
-        Reset any runtime argument derivation information from a previous run.
-        """
-        for x in list(self.parameters) + self.dimensions:
-            x.reset()
 
     def _dle_arguments(self, dim_sizes):
         # Add user-provided block sizes, if any
