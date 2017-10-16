@@ -4,7 +4,6 @@ import abc
 import numpy as np
 import sympy
 
-from devito.arguments import ScalarArgProvider, ArrayArgProvider, ObjectArgProvider
 from devito.parameters import configuration
 
 __all__ = ['Symbol', 'Indexed']
@@ -253,7 +252,7 @@ class SymbolicData(AbstractSymbol):
         return
 
 
-class Scalar(SymbolicData, ScalarArgProvider):
+class Scalar(SymbolicData):
     """Symbolic object representing a scalar.
 
     :param name: Name of the symbol
@@ -279,7 +278,7 @@ class Scalar(SymbolicData, ScalarArgProvider):
         self.dtype = dtype or self.dtype
 
 
-class Array(SymbolicData, ArrayArgProvider):
+class Array(SymbolicData):
     """Symbolic object representing a tensor.
 
     :param name: Name of the symbol
@@ -345,7 +344,7 @@ class SymbolicFunction(AbstractSymbol):
 # that need to be passed to external libraries
 
 
-class Object(ObjectArgProvider):
+class Object(object):
 
     """
     Represent a generic pointer object.

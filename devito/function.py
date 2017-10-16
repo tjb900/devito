@@ -9,7 +9,6 @@ from devito.logger import debug, error, warning
 from devito.memory import CMemory, first_touch
 from devito.cgen_utils import INT, FLOAT
 from devito.dimension import d, p, t, time, x, y, z
-from devito.arguments import ConstantArgProvider, TensorFunctionArgProvider
 from devito.types import SymbolicFunction, AbstractSymbol
 from devito.finite_difference import (centered, cross_derivative,
                                       first_derivative, left, right,
@@ -44,7 +43,7 @@ Forward = TimeAxis('Forward')
 Backward = TimeAxis('Backward')
 
 
-class Constant(SymbolicFunction, ConstantArgProvider):
+class Constant(SymbolicFunction):
 
     """
     Data object for constant values.
@@ -75,7 +74,7 @@ class Constant(SymbolicFunction, ConstantArgProvider):
         self._value = val
 
 
-class TensorFunction(SymbolicFunction, TensorFunctionArgProvider):
+class TensorFunction(SymbolicFunction):
 
     """
     Utility class to encapsulate all symbolic :class:`Function` types

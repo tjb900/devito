@@ -1,10 +1,10 @@
 from sympy import Symbol
-from devito.arguments import DimensionArgProvider
+from cached_property import cached_property
 
 __all__ = ['Dimension', 'x', 'y', 'z', 't', 'p', 'd', 'time']
 
 
-class Dimension(Symbol, DimensionArgProvider):
+class Dimension(Symbol):
 
     is_Buffered = False
     is_Lowered = False
@@ -18,7 +18,9 @@ class Dimension(Symbol, DimensionArgProvider):
     :param reverse: Traverse dimension in reverse order (default False)
     :param spacing: Optional, symbol for the spacing along this dimension.
     """
-
+    
+    _argument_names = ["size", "start", "end"]
+    
     def __new__(cls, name, **kwargs):
         newobj = Symbol.__new__(cls, name)
         newobj.reverse = kwargs.get('reverse', False)
@@ -31,23 +33,29 @@ class Dimension(Symbol, DimensionArgProvider):
     @property
     def symbolic_size(self):
         """The symbolic size of this dimension."""
-        return self.rtargs[0].as_symbol
+        return Symbol(self.size_name)
+
+    @property
+    def symbolic_start(self):
+        return Symbol(self.start_name)
+    
+    @property
+    def symbolic_end(self):
+        return Symbol(self.end_name)
 
     @property
     def size(self):
         return None
 
     @property
+    def limits(self):
+        return (self.symbolic_start, self.symbolic_end, 1)
+
+    @property
     def symbolic_extent(self):
         """Return the extent of the loop over this dimension.
         Would be the same as size if using default values """
-        _, start, end = self.rtargs
-        return (end.as_symbol - start.as_symbol)
-
-    @property
-    def limits(self):
-        _, start, end = self.rtargs
-        return (start.as_symbol, end.as_symbol, 1)
+        return (self.symbolic_end - self.symbolic_start)
 
     @property
     def size_name(self):
@@ -60,11 +68,6 @@ class Dimension(Symbol, DimensionArgProvider):
     @property
     def end_name(self):
         return "%s_e" % self.name
-
-    @property
-    def symbolic_end(self):
-        _, _, end = self.rtargs
-        return end.as_symbol
 
 
 class SpaceDimension(Dimension):
