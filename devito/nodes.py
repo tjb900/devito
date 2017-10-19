@@ -579,12 +579,7 @@ ELEMENTAL = IterationProperty('elemental')
 """The Iteration can be pulled out to an elemental function."""
 
 REMAINDER = IterationProperty('remainder')
-"""The Iteration implements a remainder/peeler loop."""
-
 WRAPPABLE = IterationProperty('wrappable')
-"""The Iteration implements modulo buffered iteration and its expressions are so that
-one or more buffer slots can be dropped without affecting correctness. For example,
-u[t+1, ...] = f(u[t, ...], u[t-1, ...]) --> u[t-1, ...] = f(u[t, ...], u[t-1, ...])."""
 
 
 def tagger(i):
