@@ -82,11 +82,20 @@ class Vector(tuple):
 
     @_asvector
     def __lt__(self, other):
-        try:
-            diff = [int(i) for i in self.order(other)]
-        except TypeError:
-            raise TypeError("Cannot compare due to non-comparable index functions")
-        return diff < [0]*self.rank
+        # This might raise an exception if the distance between the i-th entry
+        # of /self/ and /other/ isn't integer, but rather a generic function
+        # (and thus not comparable to 0). However, the implementation is "smart",
+        # in the sense that it will return as soon as the first two comparable
+        # entries (i.e., such that their distance is a non-zero integer) are found
+        for i in self.distance(other):
+            try:
+                val = int(i)
+            except TypeError:
+                raise TypeError("Cannot compare due to non-comparable index functions")
+            if val < 0:
+                return True
+            elif val > 0:
+                return False
 
     @_asvector
     def __gt__(self, other):
@@ -117,19 +126,29 @@ class Vector(tuple):
         return sum(self)
 
     def distance(self, other):
-        """Compute vector distance from ``self`` to ``other``."""
+        """
+        Compute the distance from ``self`` to ``other``.
+
+        The distance is a reflexive, transitive, and anti-symmetric relation,
+        which establishes a total ordering amongst Vectors.
+
+        The distance is a function [Vector x Vector --> D]. D is a tuple of length
+        equal to the Vector ``rank``. The i-th entry of D, D_i, indicates whether
+        the i-th component of ``self``, self_i, precedes (< 0), equals (== 0), or
+        succeeds (> 0) the i-th component of ``other``, other_i.
+
+        In particular, the *absolute value* of D_i represents the number of
+        integer points that exist between self_i and sink_i.
+
+        Example
+        =======
+                 | 3 |           | 1 |               |  2  |
+        source = | 2 | ,  sink = | 4 | , distance => | -2  |
+                 | 1 |           | 5 |               | -4  |
+
+        There are 2, 2, and 4 points between [3-2], [2-4], and [1-5], respectively.
+        """
         return self - other
-
-    def order(self, other):
-        """
-        A reflexive, transitive, and anti-symmetric relation for total ordering.
-
-        Return a tuple of length equal to the Vector ``rank``. The i-th tuple
-        entry, of type int, indicates whether the i-th component of ``self``
-        precedes (< 0), equals (== 0), or succeeds (> 0) the i-th component of
-        ``other``.
-        """
-        return self.distance(other)
 
 
 class IterationInstance(Vector):
@@ -181,12 +200,12 @@ class IterationInstance(Vector):
                 ret.append('irregular')
         return tuple(ret)
 
-    def distance(self, sink, dim=None):
-        """Compute vector distance from ``self`` to ``sink``. If ``dim`` is
+    def distance(self, other, dim=None):
+        """Compute vector distance from ``self`` to ``other``. If ``dim`` is
         supplied, compute the vector distance up to and including ``dim``."""
-        if not isinstance(sink, IterationInstance):
-            raise TypeError("Cannot compute distance from obj of type %s", type(sink))
-        if self.findices != sink.findices:
+        if not isinstance(other, IterationInstance):
+            raise TypeError("Cannot compute distance from obj of type %s", type(other))
+        if self.findices != other.findices:
             raise TypeError("Cannot compute distance due to mismatching `findices`")
         if dim is not None:
             try:
@@ -195,7 +214,7 @@ class IterationInstance(Vector):
                 raise TypeError("Cannot compute distance as `dim` is not in `findices`")
         else:
             limit = self.rank
-        return super(IterationInstance, self).distance(sink)[:limit]
+        return super(IterationInstance, self).distance(other)[:limit]
 
 
 class Access(IterationInstance):
@@ -208,7 +227,7 @@ class Access(IterationInstance):
 
     The comparison operators ``==, !=, <, <=, >, >=`` should be regarded as
     operators for lexicographic ordering of :class:`Access` objects, based
-    on the values of the access functions (and the access functions only).
+    on the values of the index functions (and the index functions only).
 
     For example, if two Access objects A and B employ the same index functions,
     the operation A == B will return True regardless of whether A and B are
@@ -314,11 +333,17 @@ class TimedAccess(Access):
     def lex_lt(self, other):
         return self.timestamp < other.timestamp
 
-    def order(self, other):
+    def distance(self, other, dim=None):
         if (self.direction != other.direction) or (self.rank != other.rank):
             raise TypeError("Cannot order due to mismatching `direction` and/or `rank`")
-        return [i - j if d == INC else j - i
-                for i, j, d in zip(self, other, self.direction)]
+        ret = super(TimedAccess, self).distance(other)
+        if dim is not None:
+            limit = self.findices.index(dim) + 1
+            direction = self.direction[:limit]
+        else:
+            direction = self.direction
+        assert len(direction) == len(ret)
+        return Vector(*[i if d == INC else (-i) for i, d in zip(ret, direction)])
 
 
 class Dependence(object):
