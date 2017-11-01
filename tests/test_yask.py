@@ -192,7 +192,7 @@ class TestOperatorSimple(object):
         u = TimeFunction(name='yu4D', grid=grid, space_order=0)
         u.data.with_halo[:] = 0.
         op = Operator(Eq(u.forward, u + 1.))
-        op(yu4D=u, t=12)
+        op(yu4D=u, t=11)
         assert 'run_solution' in str(op)
         assert np.all(u.data[0] == 10.)
         assert np.all(u.data[1] == 11.)
