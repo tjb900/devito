@@ -49,6 +49,8 @@ class Eq(sympy.Eq, FrozenExpr):
     evaluation.
     """
 
+    is_Increment = False
+
     def __new__(cls, *args, **kwargs):
         kwargs['evaluate'] = False
         obj = sympy.Eq.__new__(cls, *args, **kwargs)
@@ -61,13 +63,7 @@ class Inc(Eq):
     performed.
     """
 
-    def __new__(cls, *args, **kwargs):
-        obj = super(Inc, cls).__new__(cls, *args, **kwargs)
-        obj.is_Increment = True
-        # TODO: MAKE SURE THIS IS PROPAGATED TO TEMPORARIES
-        # PERHAPS OVERRIDE Temporary's __new__ to use `cls`
-        # so that it ends up here, setting is_Increment ?
-        return obj
+    is_Increment = True
 
 
 class Mul(sympy.Mul, FrozenExpr):

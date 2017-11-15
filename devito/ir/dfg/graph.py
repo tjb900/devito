@@ -21,11 +21,11 @@ class Temporary(Eq):
         - :class:`sympy.Eq` reading from ``self``
     """
 
-    def __new__(cls, eq, **kwargs):
+    def __new__(cls, expr, **kwargs):
         reads = kwargs.pop('reads', [])
         readby = kwargs.pop('readby', [])
-        from IPython import embed; embed()
-        obj = super(Temporary, cls).__new__(cls, *eq.args, **kwargs)
+        obj = super(Temporary, cls).__new__(cls, *expr.args, **kwargs)
+        obj.is_Increment = expr.is_Increment
         obj._reads = set(reads)
         obj._readby = set(readby)
         return obj
