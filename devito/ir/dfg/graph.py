@@ -21,10 +21,11 @@ class Temporary(Eq):
         - :class:`sympy.Eq` reading from ``self``
     """
 
-    def __new__(cls, lhs, rhs, **kwargs):
+    def __new__(cls, eq, **kwargs):
         reads = kwargs.pop('reads', [])
         readby = kwargs.pop('readby', [])
-        obj = super(Temporary, cls).__new__(cls, lhs, rhs, **kwargs)
+        from IPython import embed; embed()
+        obj = super(Temporary, cls).__new__(cls, *eq.args, **kwargs)
         obj._reads = set(reads)
         obj._readby = set(readby)
         return obj
@@ -86,7 +87,7 @@ class TemporariesGraph(OrderedDict):
 
     def __init__(self, exprs, **kwargs):
         # Check input legality
-        mapper = OrderedDict([i.args for i in exprs])
+        mapper = OrderedDict([(i.lhs, i) for i in exprs])
         if len(set(mapper)) != len(mapper):
             raise DSEException("Found redundant node, cannot build TemporariesGraph.")
 
@@ -97,7 +98,7 @@ class TemporariesGraph(OrderedDict):
         reads = DefaultOrderedDict(set)
         readby = DefaultOrderedDict(set)
         for k, v in mapper.items():
-            handle = retrieve_terminals(v)
+            handle = retrieve_terminals(v.rhs)
             for i in list(handle):
                 if i.is_Indexed:
                     for idx in i.indices:
@@ -121,7 +122,7 @@ class TemporariesGraph(OrderedDict):
                 queue.append(k)
 
         # Build up the TemporariesGraph
-        temporaries = [(i, Temporary(i, mapper[i], reads=reads[i], readby=readby[i]))
+        temporaries = [(i, Temporary(mapper[i], reads=reads[i], readby=readby[i]))
                        for i in processed]
         super(TemporariesGraph, self).__init__(temporaries, **kwargs)
 
