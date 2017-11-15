@@ -10,7 +10,7 @@ from sympy.functions.elementary.trigonometric import TrigonometricFunction
 from devito.tools import as_tuple
 
 __all__ = ['FrozenExpr', 'Eq', 'Mul', 'Add', 'FunctionFromPointer', 'ListInitializer',
-           'taylor_sin', 'taylor_cos', 'bhaskara_sin', 'bhaskara_cos']
+           'Inc', 'taylor_sin', 'taylor_cos', 'bhaskara_sin', 'bhaskara_cos']
 
 
 class FrozenExpr(Expr):
@@ -52,6 +52,21 @@ class Eq(sympy.Eq, FrozenExpr):
     def __new__(cls, *args, **kwargs):
         kwargs['evaluate'] = False
         obj = sympy.Eq.__new__(cls, *args, **kwargs)
+        return obj
+
+
+class Inc(Eq):
+    """
+    A special :class:`Eq` carrying the information that a linear increment is
+    performed.
+    """
+
+    def __new__(cls, *args, **kwargs):
+        obj = super(Inc, cls).__new__(cls, *args, **kwargs)
+        obj.is_Increment = True
+        # TODO: MAKE SURE THIS IS PROPAGATED TO TEMPORARIES
+        # PERHAPS OVERRIDE Temporary's __new__ to use `cls`
+        # so that it ends up here, setting is_Increment ?
         return obj
 
 
