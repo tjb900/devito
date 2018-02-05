@@ -150,9 +150,9 @@ class Profiler(object):
             traffic = float(profile.memory*dataspace*dtype().itemsize)
 
             # Derived metrics
-            oi = flops/traffic
-            gflopss = gflops/time
-            gpointss = gpoints/time
+            oi = flops/traffic if traffic > 0 else 0
+            gflopss = gflops/time if time > 0 else 0
+            gpointss = gpoints/time if time > 0 else 0
 
             # Keep track of performance achieved
             summary.setsection(profile.name, time, gflopss, gpointss, oi, profile.ops,
