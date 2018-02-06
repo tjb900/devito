@@ -158,7 +158,7 @@ def yask_warning(msg, *args, **kwargs):
 
 
 @contextmanager
-def bar():
-    log('='*89, INFO)
+def bar(title=""):
+    log('='*3 + title + '='*(86-len(title)), INFO)
     yield
     log('='*89, INFO)
