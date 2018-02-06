@@ -1,9 +1,10 @@
+from conftest import skipif_yask
+
 from devito import ConditionalDimension, Grid, TimeFunction, Eq, Operator
-from devito.ir.support.stencil import Stencil
-from devito.tools import pprint
 
 
-def test_subsampled_dimension():
+@skipif_yask
+def test_conditional_dimension():
     nt = 10
     grid = Grid(shape=(11, 11))
     x, y = grid.dimensions
@@ -20,6 +21,5 @@ def test_subsampled_dimension():
     save_eqn = Eq(u_s, u)
     fwd_op = Operator([fwd_eqn, fwd_eqn_2])
     fwd_op = Operator([fwd_eqn, fwd_eqn_2, save_eqn])
-    #pprint(fwd_op)
     print(fwd_op)
-
+    # TODO: finish me off
