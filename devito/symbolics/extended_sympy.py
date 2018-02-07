@@ -10,7 +10,7 @@ from sympy.functions.elementary.trigonometric import TrigonometricFunction
 from devito.region import DOMAIN
 from devito.tools import as_tuple
 
-__all__ = ['FrozenExpr', 'Eq', 'Mul', 'Add', 'FunctionFromPointer', 'ListInitializer',
+__all__ = ['FrozenExpr', 'Eq', 'Mul', 'Add', 'Pow', 'FunctionFromPointer', 'ListInitializer',
            'Inc', 'taylor_sin', 'taylor_cos', 'bhaskara_sin', 'bhaskara_cos']
 
 
@@ -74,6 +74,10 @@ class Mul(sympy.Mul, FrozenExpr):
 
 
 class Add(sympy.Add, FrozenExpr):
+    pass
+
+
+class Pow(sympy.Pow, FrozenExpr):
     pass
 
 

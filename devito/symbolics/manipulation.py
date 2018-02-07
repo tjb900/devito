@@ -3,7 +3,7 @@ from collections import Iterable, OrderedDict
 import sympy
 from sympy import Number, Indexed, Function, Symbol
 
-from devito.symbolics.extended_sympy import Add, Mul, Eq
+from devito.symbolics.extended_sympy import Add, Mul, Pow, Eq
 from devito.symbolics.search import retrieve_indexed, retrieve_functions
 from devito.dimension import Dimension
 from devito.tools import as_tuple, flatten
@@ -25,6 +25,9 @@ def freeze_expression(expr):
     elif expr.is_Mul:
         rebuilt_args = [freeze_expression(e) for e in expr.args]
         return Mul(*rebuilt_args, evaluate=False)
+    elif expr.is_Pow:
+        rebuilt_args = [freeze_expression(e) for e in expr.args]
+        return Pow(*rebuilt_args, evaluate=False)
     elif expr.is_Equality:
         rebuilt_args = [freeze_expression(e) for e in expr.args]
         return Eq(*rebuilt_args, evaluate=False)
@@ -152,14 +155,19 @@ def pow_to_mul(expr):
         return expr
     elif expr.is_Pow:
         base, exp = expr.as_base_exp()
-        if exp <= 0:
-            # Cannot handle powers containing non-integer non-positive exponents
+        if exp > 10 or exp < -10 or int(exp) != exp:
+	    # Large and non-integer powers remain untouched
             return expr
-        else:
+        elif exp > 0:
             return sympy.Mul(*[base]*exp, evaluate=False)
+        elif exp < 0:
+            # sympy represents 1/x as Pow(x,-1)
+            return sympy.Pow(sympy.Mul(*[base]*(-exp), evaluate=False), -1, evaluate=False)
+        else:
+            # exp == 0????  Surely not.  Exception?  Return 1?  Looking for feedback here.
+            return expr
     else:
         return expr.func(*[pow_to_mul(i) for i in expr.args], evaluate=False)
-
 
 def as_symbol(expr):
     """
