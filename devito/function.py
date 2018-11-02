@@ -1198,10 +1198,10 @@ class AbstractSparseFunction(TensorFunction):
         """
         The *reference* grid point corresponding to each sparse point.
 
-        .. note::
-
-            When using MPI, this property refers to the *physically* owned
-            sparse points.
+        Notes
+        -----
+        When using MPI, this property refers to the *physically* owned
+        sparse points.
         """
         raise NotImplementedError
 
@@ -1699,14 +1699,16 @@ class SparseFunction(AbstractSparseFunction, Differentiable):
         return ret
 
     def interpolate(self, expr, offset=0, increment=False, self_subs={}):
-        """Creates a :class:`sympy.Eq` equation for the interpolation
-        of an expression onto this sparse point collection.
+        """Generate equations interpolating an arbitrary expression into ``self``.
 
-        :param expr: The expression to interpolate.
-        :param offset: Additional offset from the boundary for
-                       absorbing boundary conditions.
-        :param increment: (Optional) if True, perform an increment rather
-                          than an assignment. Defaults to False.
+        Parameters
+        ----------
+        expr : sympy.Expr
+            Input expression to interpolate.
+        offset : int, optional
+            Additional offset from the boundary.
+        increment: bool, optional
+            If True, generate increments (Inc) rather than assignments (Eq).
         """
         variables = list(retrieve_functions(expr))
 
@@ -1728,12 +1730,16 @@ class SparseFunction(AbstractSparseFunction, Differentiable):
         return eqns + summands + last
 
     def inject(self, field, expr, offset=0):
-        """Symbol for injection of an expression onto a grid
+        """Generate equations injecting an arbitrary expression into a field.
 
-        :param field: The grid field into which we inject.
-        :param expr: The expression to inject.
-        :param offset: Additional offset from the boundary for
-                       absorbing boundary conditions.
+        Parameters
+        ----------
+        field : Function
+            Input field into which the injection is performed.
+        expr : sympy.Expr
+            Injected expression.
+        offset : int, optional
+            Additional offset from the boundary.
         """
 
         variables = list(retrieve_functions(expr)) + [field]
@@ -1810,7 +1816,7 @@ class SparseFunction(AbstractSparseFunction, Differentiable):
         coords = scattered
 
         # Translate global coordinates into local coordinates
-        coords = coords - np.array(self.grid.origin_domain, dtype=self.dtype)
+        coords = coords - np.array(self.grid.origin_offset, dtype=self.dtype)
 
         return {self: data, self.coordinates: coords}
 
