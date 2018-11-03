@@ -1564,7 +1564,7 @@ class SparseFunction(AbstractSparseFunction, Differentiable):
 
     @property
     def coordinates_data(self):
-        return self.coordinates.data
+        return self.coordinates.data.view(np.ndarray)
 
     @property
     def _coefficients(self):
