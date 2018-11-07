@@ -188,6 +188,8 @@ class FieldFromPointer(FunctionFromPointer, Pickable):
     def field(self):
         return self.function
 
+    _pickle_kwargs = []
+
     __repr__ = __str__
 
 
@@ -211,6 +213,8 @@ class FieldFromComposite(FunctionFromPointer, Pickable):
     @property
     def composite(self):
         return self.pointer
+
+    _pickle_kwargs = []
 
     __repr__ = __str__
 
