@@ -115,11 +115,17 @@ def test_cache_blocking_structure(blockinner, exp_calls, exp_iters):
     # to avoid omp segfaults at scheduling time (only certain omp implementations,
     # including Intel's)
     conditionals = FindNodes(Conditional).visit(op._func_table['bf0'].root)
-    assert len(conditionals) == 1
+    assert len(conditionals) == 2
     conds = conditionals[0].condition.args
     expected_guarded = tree[:2+blockinner]
     assert len(conds) == len(expected_guarded)
     assert all(i.lhs == j.step for i, j in zip(conds, expected_guarded))
+    # The trip count also != 0 -- might happen with mpi=full when iterating over
+    # the remainder regions
+    conds = conditionals[1].condition.args
+    assert len(conds) == len(expected_guarded)
+    assert all(i.lhs == j.dim.symbolic_size for i, j in zip(conds, expected_guarded))
+
 
 
 def test_cache_blocking_structure_subdims():
