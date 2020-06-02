@@ -3,13 +3,13 @@ import os
 
 import numpy as np
 import cgen as c
-from sympy import And, Max, Not
+from sympy import Or, Max, Not
 
 from devito.ir import (DummyEq, Conditional, Block, Expression, ExpressionBundle, List,
-                       Prodder, Iteration, While, FindSymbols, FindNodes,
+                       Prodder, Iteration, While, FindSymbols, FindNodes, Return,
                        COLLAPSED, VECTORIZED, Transformer, IsPerfectIteration,
                        retrieve_iteration_tree, filter_iterations)
-from devito.symbolics import CondEq, CondNe, DefFunction, INT
+from devito.symbolics import CondEq, DefFunction, INT
 from devito.parameters import configuration
 from devito.passes.iet.engine import iet_pass
 from devito.tools import as_tuple, is_integer, prod
@@ -389,11 +389,15 @@ class Ompizer(object):
         # zero length; this would raise a `Floating point exception (core
         # dumped)` in some OpenMP implementations. Note that using an OpenMP
         # `if` clause won't work
-        cond = [CondNe(i.step, 0) for i in collapsed if isinstance(i.step, Symbol)]
-        cond += [i.symbolic_size > 0 for i in collapsed if hasattr(i, "symbolic_size")]
-        cond = And(*cond)
-        if cond != False:  # noqa: `cond` may be a sympy.False which would be == False
-            partree = List(body=[Conditional(cond, partree)])
+        body = []
+        cond0 = Or(*[CondEq(i.step, 0) for i in collapsed if isinstance(i.step, Symbol)])
+        if cond0 != False:   # noqa: `cond0` may be a sympy.False which would be == False
+            body.append(Conditional(cond0, Return()))
+        cond1 = Or(*[CondEq(i.symbolic_size, 0) for i in collapsed])
+        if cond1 != False:   # noqa: `cond1` may be a sympy.False which would be == False
+            body.append(Conditional(cond1, Return()))
+        if body:
+            partree = List(body=body + [partree])
         return partree
 
     def _make_nested_partree(self, partree):
