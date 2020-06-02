@@ -393,9 +393,9 @@ class Ompizer(object):
         cond0 = Or(*[CondEq(i.step, 0) for i in collapsed if isinstance(i.step, Symbol)])
         if cond0 != False:   # noqa: `cond0` may be a sympy.False which would be == False
             body.append(Conditional(cond0, Return()))
-        cond1 = Or(*[CondEq(i.symbolic_size, 0) for i in collapsed])
-        if cond1 != False:   # noqa: `cond1` may be a sympy.False which would be == False
-            body.append(Conditional(cond1, Return()))
+            cond1 = Or(*[CondEq(i.symbolic_size, 0) for i in collapsed])
+            if cond1 != False:   # noqa: `cond1` may be a sympy.False which would be == False
+                body.append(Conditional(cond1, Return()))
         if body:
             partree = List(body=body + [partree])
         return partree
