@@ -1082,7 +1082,7 @@ class PrecomputedSparseTimeFunction(AbstractSparseTimeFunction,
         )
 
 
-class MatrixSparseTimeFunction(AbstractSparseTimeFunction, Differentiable):
+class MatrixSparseTimeFunction(AbstractSparseTimeFunction):
     """
     A specialised type of SparseTimeFunction where the interpolation is externally
     defined.  Currently, this means that the (integer) grid points and associated

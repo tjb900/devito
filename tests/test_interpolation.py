@@ -5,11 +5,13 @@ import pytest
 
 from devito import (Grid, Operator, Dimension, SparseFunction, SparseTimeFunction,
                     Function, TimeFunction,
-                    PrecomputedSparseFunction, PrecomputedSparseTimeFunction)
+                    PrecomputedSparseFunction, PrecomputedSparseTimeFunction,
+                    MatrixSparseTimeFunction)
 from devito.symbolics import FLOAT
 from examples.seismic import (demo_model, TimeAxis, RickerSource, Receiver,
                               AcquisitionGeometry)
 from examples.seismic.acoustic import AcousticWaveSolver
+import scipy.sparse
 
 
 def unit_box(name='a', shape=(11, 11), grid=None):
@@ -472,3 +474,51 @@ def test_position(shape):
                                  o_x=ox_g, o_y=oy_g, o_z=oz_g)
 
     assert(np.allclose(rec.data, rec1.data, atol=1e-5))
+
+
+def test_msf_interpolate():
+    """ Test interpolation with MatrixSparseTimeFunction which accepts
+        precomputed values for interpolation coefficients, but this time
+        with a TimeFunction
+    """
+    shape = (101, 101)
+    points = [(.05, .9), (.01, .8), (0.07, 0.84)]
+    origin = (0, 0)
+
+    grid = Grid(shape=shape, origin=origin)
+    r = 2  # Constant for linear interpolation
+    #  because we interpolate across 2 neighbouring points in each dimension
+
+    u = TimeFunction(name='u', grid=grid, space_order=0, save=5)
+    for it in range(5):
+        u.data[it, :] = it
+
+    gridpoints, interpolation_coeffs = precompute_linear_interpolation(points,
+                                                                       grid, origin)
+
+    matrix = scipy.sparse.eye(len(points))
+
+    sf = MatrixSparseTimeFunction(
+        name='s', grid=grid, r=r, matrix=matrix, nt=5
+    )
+
+    sf.gridpoints.data[:] = gridpoints
+    sf.coefficients_x.data[:] = interpolation_coeffs[:, 0, :]
+    sf.coefficients_y.data[:] = interpolation_coeffs[:, 0, :]
+
+    assert sf.data.shape == (5, 3)
+
+    eqn = sf.interpolate(u)
+    op = Operator(eqn)
+    print(op)
+
+    sf.manual_scatter()
+    op(time_m=0, time_M=4)
+    sf.manual_gather()
+
+    eqn_inject = sf.inject(field=u, expr=sf)
+    op2 = Operator(eqn_inject)
+    print(op2)
+
+    for it in range(5):
+        assert np.allclose(sf.data[it, :], it)
