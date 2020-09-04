@@ -543,7 +543,7 @@ class CustomCompiler(Compiler):
 
     def __new__(cls, *args, **kwargs):
         if any(i in environ for i in ['CC', 'CXX', 'CFLAGS', 'LDFLAGS']):
-            obj = super().__new__(cls, *args, **kwargs)
+            obj = object.__new__(cls)
             obj.__init__(*args, **kwargs)
             return obj
         else:

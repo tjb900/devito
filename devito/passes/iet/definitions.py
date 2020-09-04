@@ -193,6 +193,7 @@ class DataManager(object):
                 if k.is_definition:
                     site = v[-1] if v else iet
                     self._alloc_scalar_on_low_lat_mem(site, k, storage)
+                    already_defined.append(k.write)
                     continue
                 objs = [k.write]
             elif k.is_Dereference:

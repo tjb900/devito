@@ -11,6 +11,7 @@ from devito.operations import LinearInterpolator, PrecomputedInterpolator
 from devito.symbolics import INT, cast_mapper, indexify, retrieve_function_carriers
 from devito.tools import (ReducerMap, as_tuple, flatten, prod, filter_ordered,
                           memoized_meth, is_integer)
+from devito.types.array import Array
 from devito.types.dense import DiscreteFunction, Function, SubFunction
 from devito.types.dimension import Dimension, ConditionalDimension, DefaultDimension
 from devito.types.basic import Symbol, Scalar
@@ -1362,12 +1363,20 @@ class MatrixSparseTimeFunction(AbstractSparseTimeFunction):
             dim_subs.append((d, rd + gridpoints[row, i]))
             coeffs.append(coefficients[row, rd])
 
+        dd = DefaultDimension(name='dd', default_value=1)
+        partial_sum = Array(name='partial_sum', dtype=np.float32, dimensions=(dd,))
+
         # Apply optional time symbol substitutions to lhs of assignment
         lhs = self if p_t is None else self.subs(tdim, p_t)
         lhs = lhs.subs([(pdim, mcol[nnzdim])])
         rhs = prod(coeffs) * expr.subs(dim_subs)
 
-        return [Eq(self, 0), Inc(lhs, rhs)]
+        return [
+            Eq(self, 0),
+            Eq(partial_sum[0], 0, implicit_dims=(tdim, nnzdim,)),
+            Eq(partial_sum[0], partial_sum[0] + rhs, implicit_dims=(tdim, nnzdim,)),
+            Inc(lhs, partial_sum[0], implicit_dims=(tdim, nnzdim,)),
+        ]
 
     def inject(self, field, expr, offset=0, u_t=None, p_t=None):
         """Symbol for injection of an expression onto a grid

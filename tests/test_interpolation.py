@@ -509,7 +509,7 @@ def test_msf_interpolate():
     assert sf.data.shape == (5, 3)
 
     eqn = sf.interpolate(u)
-    op = Operator(eqn)
+    op = Operator(eqn, language='openmp')
     print(op)
 
     sf.manual_scatter()
