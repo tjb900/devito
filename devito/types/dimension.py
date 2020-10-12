@@ -649,6 +649,10 @@ class SubDimension(DerivedDimension):
         else:
             return {k.name: v for k, v in self.thickness}
 
+    @property
+    def _arg_names(self):
+        return tuple(k.name for k, _ in self.thickness) + self.parent._arg_names
+
     def _arg_values(self, args, interval, grid, **kwargs):
         return self._arg_defaults(grid=grid, **kwargs)
 
