@@ -628,33 +628,41 @@ class SubDimension(DerivedDimension):
             )
 
     def _arg_defaults(self, grid=None, **kwargs):
-        if grid is not None and grid.is_distributed(self.root):
-            # Get local thickness
-            if self.local:
-                # dimension is of type ``left``/right`` - compute the 'offset'
-                # and then add 1 to get the appropriate thickness
-                ltkn = grid.distributor.glb_to_loc(self.root,
-                                                   self.thickness.left[1]-1, LEFT)
-                rtkn = grid.distributor.glb_to_loc(self.root,
-                                                   self.thickness.right[1]-1, RIGHT)
-                ltkn = ltkn+1 if ltkn is not None else 0
-                rtkn = rtkn+1 if rtkn is not None else 0
-            else:
-                # dimension is of type ``middle``
-                ltkn = grid.distributor.glb_to_loc(self.root, self.thickness.left[1],
-                                                   LEFT) or 0
-                rtkn = grid.distributor.glb_to_loc(self.root, self.thickness.right[1],
-                                                   RIGHT) or 0
-            return {i.name: v for i, v in zip(self._thickness_map, (ltkn, rtkn))}
-        else:
-            return {k.name: v for k, v in self.thickness}
+        return {}
 
     @property
     def _arg_names(self):
         return tuple(k.name for k, _ in self.thickness) + self.parent._arg_names
 
     def _arg_values(self, args, interval, grid, **kwargs):
-        return self._arg_defaults(grid=grid, **kwargs)
+        # Allow override of thickness values to disable BCs
+        # However, arguments from the user are considered global
+        # So overriding the thickness to a nonzero value should not cause
+        # boundaries to exist between ranks where they did not before
+        requested_ltkn, requested_rtkn = (
+            kwargs.get(k.name, v) for k, v in self.thickness
+        )
+
+        if grid is not None and grid.is_distributed(self.root):
+            # Get local thickness
+            if self.local:
+                # dimension is of type ``left``/right`` - compute the 'offset'
+                # and then add 1 to get the appropriate thickness
+                ltkn = grid.distributor.glb_to_loc(self.root, requested_ltkn-1, LEFT)
+                rtkn = grid.distributor.glb_to_loc(self.root, requested_rtkn-1, RIGHT)
+                ltkn = ltkn+1 if ltkn is not None else 0
+                rtkn = rtkn+1 if rtkn is not None else 0
+            else:
+                # dimension is of type ``middle``
+                ltkn = grid.distributor.glb_to_loc(self.root, requested_ltkn,
+                                                   LEFT) or 0
+                rtkn = grid.distributor.glb_to_loc(self.root, requested_rtkn,
+                                                   RIGHT) or 0
+        else:
+            ltkn = requested_ltkn
+            rtkn = requested_rtkn
+
+        return {i.name: v for i, v in zip(self._thickness_map, (ltkn, rtkn))}
 
     # Pickling support
     _pickle_args = DerivedDimension._pickle_args +\
